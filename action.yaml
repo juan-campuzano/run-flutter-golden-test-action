@@ -1,0 +1,54 @@
+name: 'Flutter Golden Tests'
+description: 'Run Flutter golden tests and upload failures as artifacts'
+author: 'juan-campuzano'
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  flutter-channel:
+    description: 'Flutter channel to install'
+    required: false
+    default: 'stable'
+  retention-days:
+    description: 'Days to keep failure artifacts'
+    required: false
+    default: '7'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: ${{ inputs.flutter-channel }}
+
+    - name: Cache Pub
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          .dart_tool
+        key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-
+
+    - name: Flutter pub get
+      run: flutter pub get
+      shell: bash
+
+    - name: Run golden tests (xvfb)
+      run: xvfb-run -a flutter test --reporter expanded
+      shell: bash
+
+    - name: Upload golden failures
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: golden-failures-${{ github.run_id }}
+        path: |
+          **/failures/**
+          test/**/failures/**
+          packages/**/test/**/failures/**
+        if-no-files-found: ignore
+        retention-days: ${{ inputs.retention-days }}
